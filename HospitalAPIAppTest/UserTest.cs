@@ -26,11 +26,7 @@ namespace HospitalAPIAppTest
                 Address = "123 Main St",
                 PhoneNumber = "555-1234",
                 Jmbg = 1234567890,
-                Gender = Gender.MALE,
-                BloodPressure = new List<int> { 120, 80 },
-                BloodSugar = new List<int> { 80, 100 },
-                BodyFat = new List<int> { 25, 30 },
-                Weight = new List<int> { 70, 75 }
+                Gender = Gender.MALE
             };
 
             var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(user);
@@ -55,11 +51,7 @@ namespace HospitalAPIAppTest
                 Address = "123 Main St",
                 PhoneNumber = "555-1234",
                 Jmbg = 1234567890,
-                Gender = Gender.MALE,
-                BloodPressure = new List<int> { 120, 80 },
-                BloodSugar = new List<int> { 80, 100 },
-                BodyFat = new List<int> { 25, 30 },
-                Weight = new List<int> { 70, 75 }
+                Gender = Gender.MALE
             };
 
             var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(user);

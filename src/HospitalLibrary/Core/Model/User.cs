@@ -1,14 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HospitalLibrary.Core.Model
 {
     public class User
     {
+        [Key]
         public int Id { get; set; }
 
         [Required]
@@ -37,13 +40,5 @@ namespace HospitalLibrary.Core.Model
         public int Jmbg { get; set; }
 
         public Gender Gender { get; set; }
-
-        public List<int> BloodPressure { get; set; }
-
-        public List<int> BloodSugar { get; set; }
-
-        public List<int> BodyFat { get; set; }
-
-        public List<int> Weight { get; set; }
     }
 }

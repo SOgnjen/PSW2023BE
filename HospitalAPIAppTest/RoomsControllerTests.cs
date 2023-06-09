@@ -1,5 +1,6 @@
 ﻿using HospitalAPI.Controllers;
 using HospitalLibrary.Core.Model;
+using HospitalLibrary.Core.Repository;
 using HospitalLibrary.Core.Service;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -15,19 +16,21 @@ namespace HospitalAPIAppTest
     public class RoomsControllerTests
     {
         private readonly RoomsController _controller;
-        private readonly Mock<IRoomService> _roomServiceMock;
+        private readonly IRoomService _roomService;
+        private readonly Mock<IRoomRepository> _roomRepositoryMock;
 
         public RoomsControllerTests()
         {
-            _roomServiceMock = new Mock<IRoomService>();
-            _controller = new RoomsController(_roomServiceMock.Object);
+            _roomRepositoryMock = new Mock<IRoomRepository>();
+            _roomService = new RoomService(_roomRepositoryMock.Object);
+            _controller = new RoomsController(_roomService);
         }
 
         [Fact]
         public void GetAll()
         {
             var rooms = new List<Room> { new Room { Id = 1, Number = "101A", Floor = 1 } };
-            _roomServiceMock.Setup(service => service.GetAll()).Returns(rooms);
+            _roomRepositoryMock.Setup(repository => repository.GetAll()).Returns(rooms);
 
             var result = _controller.GetAll() as OkObjectResult;
 
@@ -41,7 +44,7 @@ namespace HospitalAPIAppTest
         {
             var roomId = 1;
             var room = new Room { Id = roomId, Number = "101A", Floor = 1 };
-            _roomServiceMock.Setup(service => service.GetById(roomId)).Returns(room);
+            _roomRepositoryMock.Setup(repository => repository.GetById(roomId)).Returns(room);
 
             var result = _controller.GetById(roomId) as OkObjectResult;
 
@@ -53,21 +56,12 @@ namespace HospitalAPIAppTest
         [Fact]
         public void GetById_NonExistingId()
         {
-            var existingRoomId = 1;
             var nonExistingRoomId = 2;
+            _roomRepositoryMock.Setup(repository => repository.GetById(nonExistingRoomId)).Returns((Room)null);
 
-            var existingRoom = new Room { Id = existingRoomId, Number = "101A", Floor = 1 };
-            _roomServiceMock.Setup(service => service.GetById(existingRoomId)).Returns(existingRoom);
-            _roomServiceMock.Setup(service => service.GetById(nonExistingRoomId)).Returns((Room)null);
+            var result = _controller.GetById(nonExistingRoomId);
 
-            var existingResult = _controller.GetById(existingRoomId);
-            var nonExistingResult = _controller.GetById(nonExistingRoomId);
-
-            var existingOkResult = Assert.IsType<OkObjectResult>(existingResult);
-            var nonExistingNotFoundResult = Assert.IsType<NotFoundResult>(nonExistingResult);
-
-            var returnedRoom = Assert.IsAssignableFrom<Room>(existingOkResult.Value);
-            Assert.Equal(existingRoom, returnedRoom);
+            var notFoundResult = Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
@@ -101,12 +95,8 @@ namespace HospitalAPIAppTest
         {
             var roomId = 1;
             var updatedRoom = new Room { Id = roomId, Number = "101A", Floor = 2 };
-            var roomServiceMock = new Mock<IRoomService>();
-            roomServiceMock.Setup(service => service.Update(updatedRoom));
 
-            var controller = new RoomsController(roomServiceMock.Object);
-
-            var result = controller.Update(roomId, updatedRoom);
+            var result = _controller.Update(roomId, updatedRoom);
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var returnedRoom = Assert.IsAssignableFrom<Room>(okResult.Value);
@@ -118,10 +108,8 @@ namespace HospitalAPIAppTest
         {
             var roomId = 1;
             var updatedRoom = new Room { Id = roomId, Number = "101A", Floor = 2 };
-            var roomServiceMock = new Mock<IRoomService>();
-            var controller = new RoomsController(roomServiceMock.Object);
 
-            var result = controller.Update(roomId + 1, updatedRoom);
+            var result = _controller.Update(roomId + 1, updatedRoom);
 
             var badRequestResult = Assert.IsType<BadRequestResult>(result);
         }
@@ -132,12 +120,9 @@ namespace HospitalAPIAppTest
         {
             var roomId = 1;
             var room = new Room { Id = roomId, Number = "101A", Floor = 2 };
-            var roomServiceMock = new Mock<IRoomService>();
-            roomServiceMock.Setup(service => service.GetById(roomId)).Returns(room);
+            _roomRepositoryMock.Setup(repository => repository.GetById(roomId)).Returns(room);
 
-            var controller = new RoomsController(roomServiceMock.Object);
-
-            var result = controller.Delete(roomId);
+            var result = _controller.Delete(roomId);
 
             var noContentResult = Assert.IsType<NoContentResult>(result);
         }
@@ -146,12 +131,9 @@ namespace HospitalAPIAppTest
         public void Delete_NonExistingId()
         {
             var roomId = 1;
-            var roomServiceMock = new Mock<IRoomService>();
-            roomServiceMock.Setup(service => service.GetById(roomId)).Returns((Room)null);
+            _roomRepositoryMock.Setup(repository => repository.GetById(roomId)).Returns((Room)null);
 
-            var controller = new RoomsController(roomServiceMock.Object);
-
-            var result = controller.Delete(roomId);
+            var result = _controller.Delete(roomId);
 
             var notFoundResult = Assert.IsType<NotFoundResult>(result);
         }
