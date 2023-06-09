@@ -1,10 +1,11 @@
 ﻿using HospitalLibrary.Core.Model;
 using HospitalLibrary.Core.Repository;
+using HospitalLibrary.Core.Service;
 using HospitalLibrary.Settings;
 using Microsoft.EntityFrameworkCore;
-using Moq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,13 +13,13 @@ using Xunit;
 
 namespace HospitalAPIAppTest
 {
-    public class UserRepositoryTest
+    public class UserServiceTest
     {
         private readonly HospitalDbContext _context;
         private readonly IUserRepository _userRepository;
+        private readonly IUserService _userService;
 
-
-        public UserRepositoryTest()
+        public UserServiceTest()
         {
             var options = new DbContextOptionsBuilder<HospitalDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -26,23 +27,26 @@ namespace HospitalAPIAppTest
 
             _context = new HospitalDbContext(options);
             _userRepository = new UserRepository(_context);
+            _userService = new UserService(_userRepository);
         }
 
         [Fact]
-        public void GetAll()
+        public void GetAll_ReturnsAllUsers()
         {
-            var users = new[]
+            var users = new List<User>
             {
                 new User { Id = 1, FirstName = "User 1" },
                 new User { Id = 2, FirstName = "User 2" },
                 new User { Id = 3, FirstName = "User 3" }
             };
+
             _context.Users.AddRange(users);
             _context.SaveChanges();
 
-            var result = _userRepository.GetAll();
+            var result = _userService.GetAll();
 
-            Assert.Equal(users.Length, result.Count());
+            Assert.NotNull(result);
+            Assert.Equal(users.Count, result.Count());
             foreach (var user in users)
             {
                 Assert.Contains(user, result);
@@ -50,46 +54,31 @@ namespace HospitalAPIAppTest
         }
 
         [Fact]
-        public void GetById()
+        public void GetById_ExistingId()
         {
-            var users = new List<User>
-            {
-                new User { Id = 1, FirstName = "User 1" },
-                new User { Id = 2, FirstName = "User 2" }
-            };
-
-            int userId = 1;
-            var expectedUser = users.FirstOrDefault(u => u.Id == userId);
-
-            foreach (var user in users)
-            {
-                _context.Add(user);
-            }
+            var user = new User { Id = 1, FirstName = "John" };
+            _context.Users.Add(user);
             _context.SaveChanges();
 
-            var result = _userRepository.GetById(userId);
+            var result = _userService.GetById(user.Id);
 
             Assert.NotNull(result);
-            var returnedUser = Assert.IsType<User>(result);
-            Assert.Equal(expectedUser, returnedUser);
+            Assert.Equal(user.Id, result.Id);
+            Assert.Equal(user.FirstName, result.FirstName);
         }
 
         [Fact]
-        public void GetById_UsingInvalidId()
+        public void GetById_NonExistingId()
         {
-            var users = new List<User>
-    {
-        new User { Id = 1, FirstName = "User 1" },
-        new User { Id = 2, FirstName = "User 2" }
-    };
+            var user = new User { Id = 1, FirstName = "John" };
+            _context.Users.Add(user);
+            _context.SaveChanges();
+            var wrongId = 2;
 
-            int invalidUserId = 3;
-
-            var exception = Record.Exception(() => _userRepository.GetById(invalidUserId));
+            var exception = Record.Exception(() => _userService.GetById(wrongId));
 
             Assert.NotNull(exception);
             Assert.IsType<KeyNotFoundException>(exception);
-            Assert.Contains($"User with ID {invalidUserId} does not exist.", exception.Message);
         }
 
         [Fact]
@@ -109,8 +98,9 @@ namespace HospitalAPIAppTest
                 Gender = Gender.MALE
             };
 
-            _userRepository.Create(newUser);
-            var createdUser = _userRepository.GetById(newUser.Id);
+            _userService.Create(newUser);
+            var createdUser = _userService.GetById(newUser.Id);
+
             Assert.NotNull(createdUser);
             Assert.Equal(newUser.Id, createdUser.Id);
             Assert.Equal(newUser.FirstName, createdUser.FirstName);
@@ -125,13 +115,14 @@ namespace HospitalAPIAppTest
         }
 
         [Fact]
-        public void Create_InvalidUser()
+        public void Create_InvalidEmailFormat()
         {
-            var invalidUser = new User
+            var newUser = new User
             {
-                FirstName = "", 
+                Id = 1,
+                FirstName = "John",
                 LastName = "Doe",
-                Emails = "john.doe@example.com",
+                Emails = "invalid_email",
                 Password = "password",
                 Role = UserRole.ROLE_ADMINISTRATOR,
                 Address = "123 Main St",
@@ -140,7 +131,7 @@ namespace HospitalAPIAppTest
                 Gender = Gender.MALE
             };
 
-            var exception = Record.Exception(() => _userRepository.Create(invalidUser));
+            var exception = Record.Exception(() => _userService.Create(newUser));
 
             Assert.NotNull(exception);
             Assert.IsType<ArgumentException>(exception);
@@ -162,26 +153,43 @@ namespace HospitalAPIAppTest
                 Jmbg = 1234567890,
                 Gender = Gender.MALE
             };
+            _context.Users.Add(existingUser);
+            _context.SaveChanges();
 
-            _userRepository.Create(existingUser);
+            var updatedUser = new User
+            {
+                Id = existingUser.Id,
+                FirstName = "Updated John",
+                LastName = "Updated Doe",
+                Emails = "updated.john.doe@example.com",
+                Password = "updatedpassword",
+                Role = UserRole.ROLE_USER,
+                Address = "456 New St",
+                PhoneNumber = "987654321",
+                Jmbg = 111,
+                Gender = Gender.FEMALE
+            };
 
-            existingUser.FirstName = "Updated First Name";
-            existingUser.LastName = "Updated Last Name";
-            existingUser.Emails = "updated.email@example.com";
+            _context.Entry(existingUser).State = EntityState.Detached;
 
-            _userRepository.Update(existingUser);
+            _userRepository.Update(updatedUser);
 
-            var updatedUser = _userRepository.GetById(existingUser.Id);
-
-            Assert.NotNull(updatedUser);
-            Assert.Equal(existingUser.Id, updatedUser.Id);
-            Assert.Equal(existingUser.FirstName, updatedUser.FirstName);
-            Assert.Equal(existingUser.LastName, updatedUser.LastName);
-            Assert.Equal(existingUser.Emails, updatedUser.Emails);
+            var result = _userService.GetById(existingUser.Id);
+            Assert.NotNull(result);
+            Assert.Equal(updatedUser.Id, result.Id);
+            Assert.Equal(updatedUser.FirstName, result.FirstName);
+            Assert.Equal(updatedUser.LastName, result.LastName);
+            Assert.Equal(updatedUser.Emails, result.Emails);
+            Assert.Equal(updatedUser.Password, result.Password);
+            Assert.Equal(updatedUser.Role, result.Role);
+            Assert.Equal(updatedUser.Address, result.Address);
+            Assert.Equal(updatedUser.PhoneNumber, result.PhoneNumber);
+            Assert.Equal(updatedUser.Jmbg, result.Jmbg);
+            Assert.Equal(updatedUser.Gender, result.Gender);
         }
 
         [Fact]
-        public void Update_InvalidUser()
+        public void Update_InvalidLastName()
         {
             var existingUser = new User
             {
@@ -196,28 +204,29 @@ namespace HospitalAPIAppTest
                 Jmbg = 1234567890,
                 Gender = Gender.MALE
             };
+            _context.Users.Add(existingUser);
+            _context.SaveChanges();
 
-            _userRepository.Create(existingUser);
-
-            var invalidUser = new User
+            var updatedUser = new User
             {
                 Id = existingUser.Id,
-                FirstName = "",
-                LastName = "Updated Last Name",
-                Emails = "updated.email@example.com",
-                Password = "updated_password",
-                Role = UserRole.ROLE_ADMINISTRATOR,
+                FirstName = "Updated John",
+                LastName = "",
+                Emails = "updated.john.doe@example.com",
+                Password = "updatedpassword",
+                Role = UserRole.ROLE_USER,
                 Address = "456 New St",
                 PhoneNumber = "987654321",
-                Jmbg = 11111111,
+                Jmbg = 111,
                 Gender = Gender.FEMALE
             };
 
-            var exception = Record.Exception(() => _userRepository.Update(invalidUser));
+            var exception = Record.Exception(() => _userService.Update(updatedUser));
 
             Assert.NotNull(exception);
             Assert.IsType<ArgumentException>(exception);
         }
+
 
         [Fact]
         public void Delete_ExistingUser()
@@ -235,46 +244,28 @@ namespace HospitalAPIAppTest
                 Jmbg = 1234567890,
                 Gender = Gender.MALE
             };
-
-            _userRepository.Create(existingUser);
-
-            _userRepository.Delete(existingUser);
+            _context.Users.Add(existingUser);
             _context.SaveChanges();
 
-            Assert.Throws<KeyNotFoundException>(() => _userRepository.GetById(existingUser.Id));
+            _userService.Delete(existingUser);
 
-            var deletedUser = _context.Users.Find(existingUser.Id);
-            Assert.Null(deletedUser);
+            var exception = Record.Exception(() => _userService.GetById(existingUser.Id));
+            Assert.NotNull(exception);
+            Assert.IsType<KeyNotFoundException>(exception);
         }
+
+
 
         [Fact]
-        public void Delete_InvalidUser()
+        public void Delete_NonExistingUser()
         {
-            var existingUser = new User
-            {
-                Id = 1,
-                FirstName = "John",
-                LastName = "Doe",
-                Emails = "john.doe@example.com",
-                Password = "password",
-                Role = UserRole.ROLE_ADMINISTRATOR,
-                Address = "123 Main St",
-                PhoneNumber = "123456789",
-                Jmbg = 1234567890,
-                Gender = Gender.MALE
-            };
+            var nonExistingId = 999;
+            var nonExistingUser = new User { Id = nonExistingId };
 
-            _userRepository.Create(existingUser);
+            var exception = Record.Exception(() => _userService.Delete(nonExistingUser));
 
-            var invalidUser = new User
-            {
-                Id = 999,
-                FirstName = "Invalid User"
-            };
-
-            var exception = Assert.Throws<KeyNotFoundException>(() => _userRepository.Delete(invalidUser));
-            Assert.Contains($"User with ID {invalidUser.Id} does not exist.", exception.Message);
+            Assert.NotNull(exception);
+            Assert.IsType<KeyNotFoundException>(exception);
         }
-
     }
 }

@@ -26,7 +26,14 @@ namespace HospitalLibrary.Core.Repository
 
         public User GetById(int id)
         {
-            return _context.Users.Find(id);
+            var user = _context.Users.Find(id);
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException($"User with ID {id} does not exist.");
+            }
+
+            return user;
         }
 
         public void Create(User user)
@@ -45,6 +52,24 @@ namespace HospitalLibrary.Core.Repository
 
         public void Update(User user)
         {
+            var existingUser = GetById(user.Id);
+
+            if (existingUser == null)
+            {
+                throw new KeyNotFoundException($"User with ID {user.Id} does not exist.");
+            }
+
+            var validationContext = new ValidationContext(user);
+            var validationResults = new List<ValidationResult>();
+            if (!Validator.TryValidateObject(user, validationContext, validationResults, true))
+            {
+                var errorMessages = validationResults.Select(r => r.ErrorMessage);
+                throw new ArgumentException(string.Join(Environment.NewLine, errorMessages));
+            }
+
+            _context.Entry(existingUser).State = EntityState.Detached;
+
+            _context.Users.Attach(user);
             _context.Entry(user).State = EntityState.Modified;
 
             try
@@ -59,7 +84,14 @@ namespace HospitalLibrary.Core.Repository
 
         public void Delete(User user)
         {
-            _context.Users.Remove(user);
+            var existingUser = _context.Users.Find(user.Id);
+
+            if (existingUser == null)
+            {
+                throw new KeyNotFoundException($"User with ID {user.Id} does not exist.");
+            }
+
+            _context.Users.Remove(existingUser);
             _context.SaveChanges();
         }
     }
