@@ -13,7 +13,7 @@ using Xunit;
 
 namespace HospitalAPIAppTest
 {
-    public class UserServiceTest
+    public class UserServiceTest : IDisposable
     {
         private readonly HospitalDbContext _context;
         private readonly IUserRepository _userRepository;
@@ -29,6 +29,13 @@ namespace HospitalAPIAppTest
             _userRepository = new UserRepository(_context);
             _userService = new UserService(_userRepository);
         }
+        public void Dispose()
+        {
+            _context.Database.EnsureDeleted();
+            _context.SaveChanges();
+            _context.Dispose();
+        }
+
 
         [Fact]
         public void GetAll_ReturnsAllUsers()

@@ -12,11 +12,10 @@ using Xunit;
 
 namespace HospitalAPIAppTest
 {
-    public class UserRepositoryTest
+    public class UserRepositoryTest : IDisposable
     {
         private readonly HospitalDbContext _context;
         private readonly IUserRepository _userRepository;
-
 
         public UserRepositoryTest()
         {
@@ -26,6 +25,13 @@ namespace HospitalAPIAppTest
 
             _context = new HospitalDbContext(options);
             _userRepository = new UserRepository(_context);
+        }
+
+        public void Dispose()
+        {
+            _context.Database.EnsureDeleted();
+            _context.SaveChanges();
+            _context.Dispose();
         }
 
         [Fact]
@@ -78,10 +84,10 @@ namespace HospitalAPIAppTest
         public void GetById_UsingInvalidId()
         {
             var users = new List<User>
-    {
-        new User { Id = 1, FirstName = "User 1" },
-        new User { Id = 2, FirstName = "User 2" }
-    };
+            {
+                new User { Id = 1, FirstName = "User 1" },
+                new User { Id = 2, FirstName = "User 2" }
+            };
 
             int invalidUserId = 3;
 
@@ -129,7 +135,7 @@ namespace HospitalAPIAppTest
         {
             var invalidUser = new User
             {
-                FirstName = "", 
+                FirstName = "",
                 LastName = "Doe",
                 Emails = "john.doe@example.com",
                 Password = "password",
@@ -275,6 +281,5 @@ namespace HospitalAPIAppTest
             var exception = Assert.Throws<KeyNotFoundException>(() => _userRepository.Delete(invalidUser));
             Assert.Contains($"User with ID {invalidUser.Id} does not exist.", exception.Message);
         }
-
     }
 }
